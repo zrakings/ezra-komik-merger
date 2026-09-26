@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Penggabung Gambar ke PDF / CBZ / Gambar</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- jsPDF CDN (untuk membuat file PDF) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- JSZip CDN (untuk membuat file CBZ / ZIP) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-6 flex flex-col items-center justify-start">
+
+    <div class="max-w-3xl w-full bg-slate-800 rounded-xl shadow-2xl p-6 border border-slate-700">
+        <div class="text-center mb-6">
+            <h1 class="text-2xl font-bold text-blue-400 mb-2">Penggabung Gambar ke PDF / CBZ / ZIP</h1>
+            <p class="text-slate-400 text-sm">Gabungkan beberapa file gambar menjadi satu PDF, dokumen komik (CBZ), arsip ZIP, atau gambar panjang utuh.</p>
+        </div>
+
+        <!-- Area Upload Gambar -->
+        <div class="border-2 border-dashed border-slate-600 rounded-lg p-6 text-center hover:border-blue-500 transition cursor-pointer bg-slate-800/50 mb-6" id="drop-zone">
+            <input type="file" id="file-input" accept="image/*" multiple class="hidden">
+            <label for="file-input" class="cursor-pointer flex flex-col items-center">
+                <svg class="w-10 h-10 text-slate-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+                <span class="text-slate-200 font-medium">Klik atau seret beberapa file gambar ke sini</span>
+                <span class="text-xs text-slate-500 mt-1">Mendukung PNG, JPG, WEBP, dll.</span>
+            </label>
+        </div>
+
+        <!-- Pengaturan Nama File, Tata Letak & Opsi Output -->
+        <div id="settings-section" class="hidden space-y-4 mb-6 bg-slate-900/50 p-4 rounded-lg border border-slate-700">
+            <!-- Input Nama File Output -->
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Nama File Hasil (Tanpa Ekstensi)</label>
+                <input type="text" id="custom-filename" placeholder="Masukkan nama file (contoh: Hasil_Penggabungan)" value="Hasil_Penggabungan" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500">
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Format Output Utama</label>
+                    <select id="output-type" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500">
+                        <option value="pdf">PDF Document (.pdf)</option>
+                        <option value="cbz">Comic Book Archive (.cbz)</option>
+                        <option value="zip">ZIP Archive (.zip)</option>
+                        <option value="single-image">Gambar Tunggal Disambung</option>
+                    </select>
+                </div>
+
+                <!-- Opsi Tambahan untuk Gambar Tunggal -->
+                <div id="image-direction-container" class="hidden">
+                    <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Arah Sambungan Gambar</label>
+                    <select id="layout-direction" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500">
+                        <option value="vertical">Vertikal (Atas ke Bawah)</option>
+                        <option value="horizontal">Horisontal (Kiri ke Kanan)</option>
+                        <option value="grid">Grid (2 Kolom)</option>
+                    </select>
+                </div>
+
+                <!-- Format Gambar / Kompresi -->
+                <div id="image-format-container">
+                    <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Format Gambar Dalam File</label>
+                    <select id="output-format" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500">
+                        <option value="image/png">PNG</option>
+                        <option value="image/jpeg">JPEG</option>
+                        <option value="image/webp">WEBP</option>
+                    </select>
+                </div>
+
+                <div id="gap-container" class="hidden">
+                    <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Jarak Antar Gambar (px)</label>
+                    <input type="number" id="gap-input" value="0" min="0" max="100" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500">
+                </div>
+            </div>
+        </div>
+
+        <!-- Daftar Preview Gambar yang Diunggah -->
+        <div id="preview-list" class="hidden space-y-2 mb-6 max-h-60 overflow-y-auto pr-2">
+            <!-- Item preview akan dimasukkan lewat JS -->
+        </div>
+
+        <!-- Tombol Aksi -->
+        <div id="action-buttons" class="hidden flex flex-col sm:flex-row gap-3">
+            <button id="clear-btn" class="w-full sm:w-1/3 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 py-2.5 rounded-lg font-medium transition text-sm">
+                Hapus Semua
+            </button>
+            <button id="merge-btn" class="w-full sm:w-2/3 bg-blue-600 hover:bg-blue-500 text-white py-2.5 rounded-lg font-semibold transition text-sm shadow-lg shadow-blue-600/30 flex justify-center items-center gap-2">
+                <span>Proses & Download File</span>
+            </button>
+        </div>
+
+        <!-- Status & Canvas Tersembunyi -->
+        <div id="status-text" class="mt-4 text-center text-sm font-medium text-slate-400"></div>
+        <canvas id="canvas" class="hidden"></canvas>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const previewList = document.getElementById('preview-list');
+        const settingsSection = document.getElementById('settings-section');
+        const actionButtons = document.getElementById('action-buttons');
+        const mergeBtn = document.getElementById('merge-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const statusText = document.getElementById('status-text');
+        const canvas = document.getElementById('canvas');
+
+        const outputTypeSelect = document.getElementById('output-type');
+        const imageDirectionContainer = document.getElementById('image-direction-container');
+        const gapContainer = document.getElementById('gap-container');
+        const customFilenameInput = document.getElementById('custom-filename');
+
+        let imageFiles = [];
+
+        // Dynamic Settings View Adjustment
+        outputTypeSelect.addEventListener('change', () => {
+            const val = outputTypeSelect.value;
+            if (val === 'single-image') {
+                imageDirectionContainer.classList.remove('hidden');
+                gapContainer.classList.remove('hidden');
+            } else {
+                imageDirectionContainer.classList.add('hidden');
+                gapContainer.classList.add('hidden');
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            if (files.length === 0) return;
+
+            // Urutkan berdasarkan nama file secara alami (1, 2, 10 bukan 1, 10, 2)
+            files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+
+            imageFiles = [...imageFiles, ...files];
+            renderPreviewList();
+        });
+
+        function renderPreviewList() {
+            previewList.innerHTML = '';
+
+            if (imageFiles.length === 0) {
+                previewList.classList.add('hidden');
+                settingsSection.classList.add('hidden');
+                actionButtons.classList.add('hidden');
+                statusText.innerText = '';
+                return;
+            }
+
+            previewList.classList.remove('hidden');
+            settingsSection.classList.remove('hidden');
+            actionButtons.classList.remove('hidden');
+
+            imageFiles.forEach((file, index) => {
+                const item = document.createElement('div');
+                item.className = 'flex items-center justify-between bg-slate-700/50 p-2 rounded border border-slate-700 text-xs';
+                
+                const imgUrl = URL.createObjectURL(file);
+
+                item.innerHTML = `
+                    <div class="flex items-center space-x-3 overflow-hidden">
+                        <span class="font-bold text-slate-400 w-6 text-center">${index + 1}</span>
+                        <img src="${imgUrl}" class="w-10 h-10 object-cover rounded bg-slate-900 border border-slate-600">
+                        <span class="truncate text-slate-200 font-medium">${file.name}</span>
+                    </div>
+                    <button onclick="removeImage(${index})" class="text-red-400 hover:text-red-300 p-1 font-bold">✕</button>
+                `;
+
+                previewList.appendChild(item);
+            });
+
+            statusText.innerText = `${imageFiles.length} gambar siap diproses.`;
+        }
+
+        function removeImage(index) {
+            imageFiles.splice(index, 1);
+            renderPreviewList();
+        }
+
+        clearBtn.addEventListener('click', () => {
+            imageFiles = [];
+            fileInput.value = '';
+            renderPreviewList();
+        });
+
+        // Helper untuk mendapatkan nama file aman
+        function getSafeFilename(defaultName) {
+            const rawName = customFilenameInput.value.trim();
+            if (!rawName) return defaultName;
+            // Sanitasi nama file agar aman dari karakter illegal
+            return rawName.replace(/[/\\?%*:|"<>]/g, '_');
+        }
+
+        mergeBtn.addEventListener('click', async () => {
+            if (imageFiles.length === 0) return;
+
+            statusText.innerText = 'Memuat dan mengolah gambar...';
+            mergeBtn.disabled = true;
+
+            try {
+                // Load semua gambar ke elemen Image HTML
+                const loadedImages = await Promise.all(imageFiles.map(file => {
+                    return new Promise((resolve, reject) => {
+                        const img = new Image();
+                        img.onload = () => resolve({ img, file });
+                        img.onerror = reject;
+                        img.src = URL.createObjectURL(file);
+                    });
+                }));
+
+                const outputType = outputTypeSelect.value;
+                const format = document.getElementById('output-format').value;
+                const filename = getSafeFilename('Hasil_Penggabungan');
+
+                if (outputType === 'pdf') {
+                    await generatePDF(loadedImages, format, filename);
+                } else if (outputType === 'cbz' || outputType === 'zip') {
+                    await generateArchive(loadedImages, outputType, format, filename);
+                } else if (outputType === 'single-image') {
+                    await generateSingleMergedImage(loadedImages, format, filename);
+                }
+
+            } catch (err) {
+                console.error(err);
+                statusText.innerText = 'Terjadi kesalahan saat memproses file.';
+            } finally {
+                mergeBtn.disabled = false;
+            }
+        });
+
+        // 1. Ekspor ke PDF
+        async function generatePDF(loadedImages, format, filename) {
+            const { jsPDF } = window.jspdf;
+            let pdf = null;
+
+            for (let i = 0; i < loadedImages.length; i++) {
+                const { img } = loadedImages[i];
+                
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+
+                const imgData = canvas.toDataURL(format, 0.92);
+                const orientation = img.width > img.height ? 'l' : 'p';
+
+                if (i === 0) {
+                    pdf = new jsPDF({
+                        orientation: orientation,
+                        unit: 'px',
+                        format: [img.width, img.height]
+                    });
+                } else {
+                    pdf.addPage([img.width, img.height], orientation);
+                }
+
+                pdf.addImage(imgData, format === 'image/png' ? 'PNG' : 'JPEG', 0, 0, img.width, img.height);
+                statusText.innerText = `Menambahkan ke PDF: Halaman ${i + 1} dari ${loadedImages.length}`;
+            }
+
+            pdf.save(`${filename}.pdf`);
+            statusText.innerText = 'File PDF berhasil dibuat dan diunduh!';
+        }
+
+        // 2. Ekspor ke CBZ atau ZIP
+        async function generateArchive(loadedImages, extension, format, filename) {
+            const zip = new JSZip();
+            const ext = format.split('/')[1];
+
+            for (let i = 0; i < loadedImages.length; i++) {
+                const { img } = loadedImages[i];
+                
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+
+                const dataUrl = canvas.toDataURL(format, 0.92);
+                const base64Data = dataUrl.split(',')[1];
+                
+                const pageNum = String(i + 1).padStart(3, '0');
+                zip.file(`page_${pageNum}.${ext}`, base64Data, { base64: true });
+
+                statusText.innerText = `Menambahkan ke ${extension.toUpperCase()}: Gambar ${i + 1} dari ${loadedImages.length}`;
+            }
+
+            statusText.innerText = `Mengompres file ${extension.toUpperCase()}...`;
+            const content = await zip.generateAsync({ type: 'blob' });
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(content);
+            link.download = `${filename}.${extension}`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            statusText.innerText = `File ${extension.toUpperCase()} berhasil diunduh!`;
+        }
+
+        // 3. Ekspor ke Gambar Tunggal Disambung
+        async function generateSingleMergedImage(loadedImages, format, filename) {
+            const direction = document.getElementById('layout-direction').value;
+            const gap = parseInt(document.getElementById('gap-input').value) || 0;
+            const ctx = canvas.getContext('2d');
+            const imagesOnly = loadedImages.map(item => item.img);
+
+            let totalWidth = 0;
+            let totalHeight = 0;
+
+            if (direction === 'vertical') {
+                totalWidth = Math.max(...imagesOnly.map(img => img.width));
+                totalHeight = imagesOnly.reduce((sum, img) => sum + img.height, 0) + (gap * (imagesOnly.length - 1));
+
+                canvas.width = totalWidth;
+                canvas.height = totalHeight;
+
+                if (format === 'image/jpeg') {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                }
+
+                let currentY = 0;
+                imagesOnly.forEach(img => {
+                    ctx.drawImage(img, 0, currentY);
+                    currentY += img.height + gap;
+                });
+
+            } else if (direction === 'horizontal') {
+                totalWidth = imagesOnly.reduce((sum, img) => sum + img.width, 0) + (gap * (imagesOnly.length - 1));
+                totalHeight = Math.max(...imagesOnly.map(img => img.height));
+
+                canvas.width = totalWidth;
+                canvas.height = totalHeight;
+
+                if (format === 'image/jpeg') {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                }
+
+                let currentX = 0;
+                imagesOnly.forEach(img => {
+                    ctx.drawImage(img, currentX, 0);
+                    currentX += img.width + gap;
+                });
+
+            } else if (direction === 'grid') {
+                const columns = 2;
+                const rows = Math.ceil(imagesOnly.length / columns);
+                const colWidth = Math.max(...imagesOnly.map(img => img.width));
+                const rowHeight = Math.max(...imagesOnly.map(img => img.height));
+
+                canvas.width = (colWidth * columns) + (gap * (columns - 1));
+                canvas.height = (rowHeight * rows) + (gap * (rows - 1));
+
+                if (format === 'image/jpeg') {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                }
+
+                imagesOnly.forEach((img, idx) => {
+                    const col = idx % columns;
+                    const row = Math.floor(idx / columns);
+                    const x = col * (colWidth + gap);
+                    const y = row * (rowHeight + gap);
+                    ctx.drawImage(img, x, y);
+                });
+            }
+
+            const ext = format.split('/')[1];
+            const dataUrl = canvas.toDataURL(format, 0.92);
+            
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = `${filename}.${ext}`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            statusText.innerText = 'Gambar berhasil digabungkan dan diunduh!';
+        }
+    </script>
+</body>
+</html>
